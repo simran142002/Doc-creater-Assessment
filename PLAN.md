@@ -226,7 +226,7 @@ Clickable static prototype is the visual spec for the build; build must match it
 - [x] T-6 Import route: type/size checks, mammoth/marked → TipTap JSON (≈25 min)
 - [x] T-7 (matches approved prototype, measured style diff, 65 tests, build OK) UI: login, dashboard, editor (TipTap), share dialog, upload (≈60 min)
 - [x] T-8 Tests: access matrix, import, share integration (≈25 min)
-- [ ] T-9 Deploy to Vercel + Neon, seed prod, smoke-test as 2 users (≈15 min)
+- [x] T-9 Deploy to Vercel + Neon, seed prod, smoke-test as 2 users (≈15 min)
 
 ### Phase 3 — Verification (≈15 min)
 - [ ] V-1 Walk every FR box above in the **deployed** app, two browsers/users
@@ -288,6 +288,7 @@ Decided by user: import = report + Undo; animation = capped (above).
 | Time | Update |
 |---|---|
 | 2026-10-21 | Plan & requirements drafted; awaiting scope confirmation |
+| 2026-10-21 | DEPLOYED https://ajaia-docs-blond-nu.vercel.app (Vercel CLI from folder + Neon via marketplace; vercel-build runs migrate+seed). Prod smoke test passed: sign-in ×3, dashboard catch-up counts, create, save, stale 409, share+note, viewer 403, stranger 404, .md import. GitHub push pending gh auth (MCP token can't create repos) |
 | 2026-10-21 | Hardening done: 84 scenarios (83 tested) → edge-cases artifact; tests 65→185; build OK. Fixed OOM on many-line txt, NUL chars, deep nesting, Origin:null, bad token subject, multi-file import, owner revoke, UTF-16, filename sanitizing, DB error mapping. Members list open to all members. Known gaps: revoke-race save, Latin-1, zip-bomb, rate limiting |
 | 2026-10-21 | UI done: matches prototype (tokens/fonts/motion/Rive/confetti, 640px), full flow verified on fresh seed, no console errors. Gaps: no job titles on sign-in, demo toggles omitted. Relayed to hardening agent: members list for editors/viewers via service, table rows as 'cell · cell' |
 | 2026-10-21 | README written (artifact links, 64 tests). Backend edge-case hardening agent started (auth/input/docs/concurrency/shares/import/catch-up/500s) → docs/site/edge-cases.html artifact |
