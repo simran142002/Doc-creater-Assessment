@@ -7,6 +7,7 @@ Ajaia Docs is a lightweight collaborative document editor built as a take-home. 
 ## Links
 
 - **Live app:** https://ajaia-docs-blond-nu.vercel.app (pick any seeded user, no password)
+- **Source code:** https://github.com/simran142002/Doc-creater-Assessment (private; access on request)
 - **Walkthrough video:** _TBD_
 - **Design and planning pages** (private claude.ai pages, shared with reviewers on request):
   [Product analysis](https://claude.ai/artifact/NzbFAXKpMCgw5HWw2YhnrF) · [Tech spec](https://claude.ai/artifact/2Wx5ykPdLfiBKLhh7hVZ4Y) · [Stack ledger](https://claude.ai/artifact/8GeymUd4G41WwdwfTfV3pe) · [Edge cases & error handling](https://claude.ai/artifact/Ez23KqMKHA6hkQkggtn5hd)

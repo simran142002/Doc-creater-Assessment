@@ -3,7 +3,7 @@
 ## Links
 
 - **Live app:** https://ajaia-docs-blond-nu.vercel.app (Vercel Hobby + Neon free)
-- **Source repo:** to be added (github.com/simran142002/ajaia-docs, public)
+- **Source repo:** https://github.com/simran142002/Doc-creater-Assessment (private; access on request)
 - **Walkthrough video:** see [VIDEO.txt](VIDEO.txt)
 - **Planning pages** (private claude.ai pages until shared with you): [Product analysis](https://claude.ai/artifact/NzbFAXKpMCgw5HWw2YhnrF) · [Tech spec](https://claude.ai/artifact/2Wx5ykPdLfiBKLhh7hVZ4Y) · [Stack ledger](https://claude.ai/artifact/8GeymUd4G41WwdwfTfV3pe) · [Edge cases](https://claude.ai/artifact/Ez23KqMKHA6hkQkggtn5hd)
 
