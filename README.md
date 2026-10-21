@@ -10,7 +10,7 @@ Ajaia Docs is a lightweight collaborative document editor built as a take-home. 
 - **Walkthrough video:** _TBD_
 - **Design and planning pages** (private claude.ai pages, shared with reviewers on request):
   [Product analysis](https://claude.ai/artifact/NzbFAXKpMCgw5HWw2YhnrF) · [Tech spec](https://claude.ai/artifact/2Wx5ykPdLfiBKLhh7hVZ4Y) · [Stack ledger](https://claude.ai/artifact/8GeymUd4G41WwdwfTfV3pe) · [Edge cases & error handling](https://claude.ai/artifact/Ez23KqMKHA6hkQkggtn5hd)
-- **Repo docs:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/DECISIONS.md](docs/DECISIONS.md) · [docs/PRODUCT-ANALYSIS.md](docs/PRODUCT-ANALYSIS.md) · [docs/UI-SKILLS.md](docs/UI-SKILLS.md) · [PLAN.md](PLAN.md)
+- **Repo docs:** [docs/ARCHITECTURE-NOTE.md](docs/ARCHITECTURE-NOTE.md) (short) · [AI_WORKFLOW.md](AI_WORKFLOW.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/DECISIONS.md](docs/DECISIONS.md) · [docs/PRODUCT-ANALYSIS.md](docs/PRODUCT-ANALYSIS.md) · [docs/UI-SKILLS.md](docs/UI-SKILLS.md) · [PLAN.md](PLAN.md)
 - **Design prototype:** `prototype/` (clickable; open `prototype/index.html`)
 
 ## Test accounts
@@ -92,7 +92,7 @@ npm run dev            # http://localhost:3000
 npm test
 ```
 
-Vitest against an in-process Postgres (PGlite). Latest run: **12 files, 185 tests, all passing**. 84 edge-case scenarios are catalogued in the [edge-cases page](https://claude.ai/artifact/Ez23KqMKHA6hkQkggtn5hd) (83 covered by tests). Coverage:
+Vitest against an in-process Postgres (PGlite). Latest run: **13 files, 198 tests, all passing**. 84 edge-case scenarios are catalogued in the [edge-cases page](https://claude.ai/artifact/Ez23KqMKHA6hkQkggtn5hd) (83 covered by tests). Coverage:
 - Access control: the `can()` matrix and route-level 404/403 behaviour.
 - Autosave and optimistic concurrency, including the 409 conflict path.
 - Catch-up: block hashing and diff, API behaviour, and navigation ordering.
@@ -143,18 +143,18 @@ Deliberate cuts, chosen to fit a 4-6 hour build:
 - **Sharing is by email of an existing user** only; no invites for unknown addresses.
 - Search on the dashboard is client-side.
 - Import is lossy by design (see above); `.docx` fidelity is limited to headings, lists and marks.
-- **Known gaps:** a save that passed its access check just before a revoke still lands; no zip-bomb limit on `.docx`; no rate limiting.
+- **Known gaps:** a save that passed its access check just before a revoke still lands; no zip-bomb limit on `.docx`; rate limits (429 + Retry-After) are in-memory per serverless instance, so best-effort until a shared store (Upstash / Vercel WAF) is added — see ADR-013.
 
 ## Status
 
-**Working:** auth, document CRUD, autosave and conflict handling, sharing and roles, import with report and Undo, catch-up and handoff notes, UI matching the approved prototype (responsive at 360/768/1440, Rive + motion), 185 passing tests, clean typecheck, lint and build.
+**Working:** auth, document CRUD, autosave and conflict handling, sharing and roles, import with report and Undo, catch-up and handoff notes, UI matching the approved prototype (responsive at 360/768/1440, Rive + motion), 198 passing tests, clean typecheck, lint and build.
 
 **Deployed:** Vercel (Hobby) + Neon Postgres (free), migrations and seed run on each deploy.
 
-**Incomplete:** walkthrough video, live URL, AI_WORKFLOW.md.
+**Incomplete:** walkthrough video.
 
-**Next 2-4 hours:** finish UI polish and run a manual pass at phone width; deploy and smoke-test the live app; record the video; add a few browser E2E tests for catch-up and conflict flows; sharer sees "Done" when a recipient acknowledges a handoff note.
+**Next 2-4 hours:** Playwright E2E tests for the catch-up and conflict flows; export to Markdown/PDF; presence ("Priya is here") via light polling; named version snapshots; a shared rate-limit store (Upstash); Yjs for true co-editing; word-level diff in catch-up; sharer sees "Done" when a recipient acknowledges a handoff note.
 
 ## AI workflow
 
-This project was built with Claude Code driving several scoped agents (product analysis, architecture, prototype, backend, UI), with a written plan and tracker in [PLAN.md](PLAN.md) and human sign-off gates between phases. Third-party agent skills were vetted before install ([docs/UI-SKILLS.md](docs/UI-SKILLS.md)). Details, including what was delegated, what was verified by hand, and where the AI was wrong, will be in [AI_WORKFLOW.md](AI_WORKFLOW.md) (to be written).
+This project was built with Claude Code driving several scoped agents (product analysis, architecture, prototype, backend, UI), with a written plan and tracker in [PLAN.md](PLAN.md) and human sign-off gates between phases. Third-party agent skills were vetted before install ([docs/UI-SKILLS.md](docs/UI-SKILLS.md)). Details, including what was delegated, what was verified by hand, and where the AI was wrong, are in [AI_WORKFLOW.md](AI_WORKFLOW.md).

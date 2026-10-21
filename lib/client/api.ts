@@ -3,13 +3,13 @@ import type {
 } from "./types";
 
 export class ApiError extends Error {
-  constructor(readonly code: ErrorCode | "NETWORK", message: string, readonly status: number, readonly details?: unknown) {
+  constructor(readonly code: ErrorCode | "NETWORK", message: string, readonly status: number, readonly details?: unknown, readonly retryAfter?: number) {
     super(message);
     this.name = "ApiError";
   }
-  /** Network failures and 5xx are worth one retry; 4xx are not. */
+  /** Network failures, 429 and 5xx are worth a retry; other 4xx are not. */
   get retryable() {
-    return this.code === "NETWORK" || this.status >= 500;
+    return this.code === "NETWORK" || this.status >= 500 || this.status === 429;
   }
   get stale(): StaleDetails["current"] | null {
     return this.code === "STALE_VERSION" ? ((this.details as StaleDetails | undefined)?.current ?? null) : null;
@@ -37,7 +37,8 @@ export async function request<T>(path: string, { json, headers, ...init }: Init 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const err = data?.error;
-    throw new ApiError(err?.code ?? "INTERNAL", err?.message ?? `Request failed (${res.status}).`, res.status, err?.details);
+    throw new ApiError(err?.code ?? "INTERNAL", err?.message ?? `Request failed (${res.status}).`, res.status, err?.details,
+      Number(res.headers.get("retry-after")) || undefined);
   }
   return data as T;
 }

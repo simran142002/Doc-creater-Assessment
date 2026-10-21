@@ -24,6 +24,7 @@ Each ADR covers context, options, decision, consequences and when to revisit. Se
 | 010 | UI kit & animation | Tailwind + shadcn/ui; Framer Motion for UI motion, Rive for illustrations, CSS for highlights | Lottie, pure CSS | Rive assets unavailable, or bundle budget tight |
 | 011 | Testing | Vitest + PGlite; route-handler integration; no E2E | Jest, Playwright, Docker Postgres | More time, or regressions in UI flows |
 | 012 | Deployment | Vercel Hobby + Neon; migrate + idempotent seed in build | Render/Fly + managed PG, Netlify | Commercial use, or cold starts hurt |
+| 013 | Scale, concurrency & rate limiting | In-memory fixed-window limiter per user/IP behind a swappable interface; atomic SQL for every contended write | Upstash Redis, Vercel WAF, Postgres counters | Real traffic, abuse, or more than one Vercel region/instance matters |
 
 ---
 
@@ -311,3 +312,42 @@ This fits the timebox (about 20 min server, 20 min banner) and it's the cheapest
 - The first request after idle pays Neon's cold start.
 
 **Revisit when** the project goes commercial (Vercel Pro) or needs WebSockets (ADR-007 → a separate Hocuspocus host).
+
+---
+
+## ADR-013 — Scale, concurrency & rate limiting
+**Context.** The question: what happens when 10, 100 or 1000 users open one doc, or two people share it at the same moment? Nothing was load-tested. Instead every contended path was checked in code and covered by a test.
+
+**Options (rate limiting)**
+| Option | Pros | Cons |
+|---|---|---|
+| None | Zero code | One tab in a loop can burn the free Neon compute for everyone |
+| **In-memory fixed window** | No dependency, no extra latency, easy to test with fake timers | Counted per serverless instance, so best-effort only; resets on cold start |
+| Postgres-backed counters | Exact and shared | A write on every request, on the resource we are trying to protect |
+| Upstash Redis | Exact, shared, cheap | New service and secret; extra network hop |
+| Vercel WAF rate-limit rules | Enforced at the edge before our code runs | Rule count is plan-limited; can't key on our session user |
+
+**Decision.**
+- `lib/server/rate-limit.ts` holds a `RateLimiter` interface and an in-memory fixed-window implementation. `authed` applies it after auth, keyed per user.
+- Budgets per minute: reads 300, writes 120 (autosave is debounced at ~800 ms, so a fast typist does about 60), import 10, sign-in 20 per IP. The public user list is limited per IP.
+- Over the limit: 429 `RATE_LIMITED` with `Retry-After`. Autosave waits that long and retries without dropping edits; other screens show the message.
+- Contended writes are single atomic statements: share upsert (`ON CONFLICT` on the document/user key), view upsert (per user and doc), and the version-guarded content `UPDATE`. There are no multi-statement transactions.
+- Connections: production uses the pooled `DATABASE_URL` with `neon-http` (one stateless HTTP call per query), so 1000 concurrent users can't exhaust connections. Migrations use `DATABASE_URL_UNPOOLED`.
+- Body caps (1 MB content, 2 MB import) bound the cost of each request.
+
+**10 / 100 / 1000 users on one doc**
+| | 10 | 100 | 1000 |
+|---|---|---|---|
+| Reads (GET) | Fine | Fine | Fine until Neon compute saturates; each is a few indexed queries |
+| Opens | Fine; one upsert per (user, doc), no shared row | Same | Same; the only write is per user |
+| Saves | Occasional 409 → conflict banner | Frequent 409s; one winner per base version, the rest choose Load theirs or Keep mine | Mostly conflict banners; this is where CRDT (ADR-007) would be needed |
+| Shares | Atomic upsert; both succeed, one row | Same | Same |
+| Limits | Not reached | Not reached normally | Per-user budgets hold; a single abusive user gets 429, others unaffected |
+| Bottleneck | None | Neon free-tier compute | Neon free-tier compute and Vercel Hobby function concurrency |
+
+**Consequences.**
+- Limits are per instance: a burst spread over many warm instances can exceed them. This is stated, not hidden.
+- Known gaps, accepted: a save that passed its access check just before a revoke still lands; a rename races a content save last-write-wins on title only; a save racing a delete returns 404 or lands just before the delete.
+- Moving to shared limits means implementing `RateLimiter` against Upstash (or adding Vercel WAF rules) and calling `setRateLimiter`; no route changes.
+
+**Revisit when** there is real traffic, abuse, or a need for exact limits across instances; or when many people edit one doc at once (ADR-007).

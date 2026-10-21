@@ -143,6 +143,11 @@ export class AutosaveController {
     const err = e instanceof ApiError ? e : new ApiError("NETWORK", "Couldn't save.", 0);
     const stale = err.stale;
     if (stale) return this.set({ status: "conflict", conflict: stale, error: err.message });
+    if (err.status === 429) {
+      this.set({ status: "saving", error: null });
+      this.retryTimer = setTimeout(() => void this.send(), Math.min(err.retryAfter ?? 5, 60) * 1000);
+      return;
+    }
     if (err.retryable && !this.retried) {
       this.retried = true;
       this.set({ status: "saving" });

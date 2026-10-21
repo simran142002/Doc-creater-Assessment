@@ -4,6 +4,7 @@ import type { User } from "@/lib/db/schema";
 import { requireUser } from "./auth";
 import { AppError, fromDbError } from "./errors";
 import { LIMITS } from "./limits";
+import { bucketFor, enforce } from "./rate-limit";
 
 export type Ctx<P = Record<string, string>> = { params: Promise<P> };
 
@@ -16,8 +17,13 @@ export function errorResponse(e: unknown, req?: Request) {
     console.warn(`${where(req)} → ${db.code}`, e);
     e = db;
   }
-  if (e instanceof AppError)
-    return NextResponse.json({ error: { code: e.code, message: e.message, ...(e.details ? { details: e.details } : {}) } }, { status: e.status });
+  if (e instanceof AppError) {
+    const retryAfter = (e.details as { retryAfter?: number } | undefined)?.retryAfter;
+    return NextResponse.json(
+      { error: { code: e.code, message: e.message, ...(e.details ? { details: e.details } : {}) } },
+      { status: e.status, ...(e.code === "RATE_LIMITED" && retryAfter ? { headers: { "Retry-After": String(retryAfter) } } : {}) },
+    );
+  }
   if (e instanceof ZodError) {
     const issue = e.issues[0];
     return NextResponse.json(
@@ -51,7 +57,11 @@ export function route<P>(fn: (req: Request, params: P) => Promise<Response>) {
 }
 
 export function authed<P>(fn: (req: Request, user: User, params: P) => Promise<Response>) {
-  return route<P>(async (req, params) => fn(req, await requireUser(req), params));
+  return route<P>(async (req, params) => {
+    const user = await requireUser(req);
+    await enforce(bucketFor(req), user.id);
+    return fn(req, user, params);
+  });
 }
 
 const BODY_MAX = LIMITS.contentBytes + 16 * 1024;

@@ -18,6 +18,23 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe("AutosaveController", () => {
+  it("429 waits for Retry-After and keeps retrying without losing edits", async () => {
+    const limited = new ApiError("RATE_LIMITED", "Too many requests.", 429, undefined, 7);
+    const save = vi.fn<SaveFn>().mockRejectedValueOnce(limited).mockRejectedValueOnce(limited).mockResolvedValue(ok(2));
+    const c = setup(save);
+    c.update(doc("a"));
+    await vi.advanceTimersByTimeAsync(800);
+    expect(c.getState().status).toBe("saving");
+    await vi.advanceTimersByTimeAsync(6999);
+    expect(save).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(save).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(7000);
+    expect(save).toHaveBeenCalledTimes(3);
+    expect(save.mock.calls[2][0]).toEqual({ content: doc("a"), baseVersion: 1 });
+    expect(c.getState()).toMatchObject({ status: "saved", version: 2 });
+  });
+
   it("debounces keystrokes into one save with the base version", async () => {
     const save = vi.fn<SaveFn>().mockResolvedValue(ok(2));
     const c = setup(save);

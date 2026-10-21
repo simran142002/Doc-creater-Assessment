@@ -1,10 +1,12 @@
 import { createPglite, setDb, type DB } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
+import { resetRateLimits } from "@/lib/server/rate-limit";
 import { SESSION_COOKIE, signSession } from "@/lib/server/auth";
 
 export type TestUsers = Record<"owner" | "editor" | "viewer" | "stranger", { id: string; name: string; email: string }>;
 
 export async function freshDb(): Promise<{ db: DB; u: TestUsers }> {
+  resetRateLimits();
   const db = await createPglite();
   setDb(db);
   const rows = await db.insert(users).values([
@@ -19,7 +21,7 @@ export async function freshDb(): Promise<{ db: DB; u: TestUsers }> {
 
 export async function call<P>(
   handler: (req: Request, ctx: { params: Promise<P> }) => Promise<Response>,
-  opts: { method?: string; as?: string; cookie?: string; body?: unknown; raw?: string; form?: FormData; params?: P; headers?: Record<string, string> } = {},
+  opts: { method?: string; as?: string; cookie?: string; body?: unknown; raw?: string; form?: FormData; params?: P; headers?: Record<string, string>; url?: string } = {},
 ) {
   const headers: Record<string, string> = { ...opts.headers };
   if (opts.as) headers.cookie = `${SESSION_COOKIE}=${await signSession(opts.as)}`;
@@ -31,7 +33,7 @@ export async function call<P>(
     headers["content-type"] ??= "application/json";
     body = JSON.stringify(opts.body);
   }
-  const req = new Request("http://localhost/api/test", { method: opts.method ?? "GET", headers, body });
+  const req = new Request(opts.url ?? "http://localhost/api/test", { method: opts.method ?? "GET", headers, body });
   const res = await handler(req, { params: Promise.resolve((opts.params ?? {}) as P) });
   const text = await res.text();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

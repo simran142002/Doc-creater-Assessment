@@ -1,0 +1,11 @@
+Walkthrough video: <URL to be added>
+
+Suggested outline (3-5 min). This is a suggestion, adjust as you like.
+
+0:00  Problem and positioning: opening a shared doc should tell you what changed, by default, with no setup.
+0:30  Sign in as Aarav. Dashboard catch-up counts. Open "Design review: onboarding": marked blocks, prev/next, "all caught up".
+1:30  Create a doc, format it, rename it, reload to show it persisted.
+2:15  Share with Priya as viewer, add a note. Switch to Priya: note appears, doc is read-only.
+3:00  Import a .md or .docx: show the report, then Undo.
+3:30  Conflict-safe save: edit the same doc in two tabs, show the conflict banner.
+4:00  Deliberate cuts (no CRDT, simulated auth, block-level catch-up), architecture in one sentence, how AI was used and where it was wrong.

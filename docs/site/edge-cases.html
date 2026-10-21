@@ -35,10 +35,10 @@ ul.gaps{margin:8px 0 0;padding-left:20px;max-width:80ch}ul.gaps li{margin:6px 0}
 </style>
 <main>
 <h1>Ajaia Docs — Edge Cases &amp; Error Handling</h1>
-<p class="summary"><b>84</b> scenarios, <b>83</b> covered by automated tests, <b>1</b> checked manually. <b>18</b> were bugs or gaps fixed in this pass.</p>
-<p class="lede">How the API behaves when requests are wrong, hostile, late or racing each other. Every error comes back as <code>{"error":{"code","message","details?"}}</code>. Tests live in <code>tests/</code> and run against an in-memory Postgres (PGlite). 65 tests before this pass, 185 after.</p>
+<p class="summary"><b>97</b> scenarios, <b>94</b> covered by automated tests, <b>3</b> checked manually or by design. <b>18</b> were bugs or gaps fixed in this pass.</p>
+<p class="lede">How the API behaves when requests are wrong, hostile, late or racing each other. Every error comes back as <code>{"error":{"code","message","details?"}}</code>. Tests live in <code>tests/</code> and run against an in-memory Postgres (PGlite). 65 tests before this pass, 198 after.</p>
 <p class="legend"><span class="tag fixed">Fixed</span> behaviour changed in this pass &nbsp; <span class="tag new">New</span> new rule or mapping</p>
-<nav aria-label="Areas"><a href="#codes">Error codes</a><a href="#auth">Auth</a><a href="#input">Input</a><a href="#documents">Documents</a><a href="#concurrency">Concurrency</a><a href="#sharing">Sharing</a><a href="#import">Import</a><a href="#catch-up">Catch-up</a><a href="#server-errors">Server errors</a><a href="#gaps">Not handled</a></nav>
+<nav aria-label="Areas"><a href="#codes">Error codes</a><a href="#auth">Auth</a><a href="#input">Input</a><a href="#documents">Documents</a><a href="#concurrency">Concurrency</a><a href="#sharing">Sharing</a><a href="#import">Import</a><a href="#catch-up">Catch-up</a><a href="#load">Load</a><a href="#server-errors">Server errors</a><a href="#gaps">Not handled</a></nav>
 
 <section id="codes" class="codes"><h2>Error codes</h2>
 <div class="tw"><table><thead><tr><th>Code</th><th>Status</th><th>Meaning</th></tr></thead><tbody>
@@ -55,6 +55,7 @@ ul.gaps{margin:8px 0 0;padding-left:20px;max-width:80ch}ul.gaps li{margin:6px 0}
 <tr><td><code>CORRUPT_FILE</code></td><td>422</td><td>Damaged .docx, text that isn't UTF-8/UTF-16, or a binary file renamed to .txt.</td></tr>
 <tr><td><code>SELF_SHARE</code></td><td>422</td><td>The owner tried to share with themself.</td></tr>
 <tr><td><code>USER_NOT_FOUND</code></td><td>422</td><td>No account uses that email.</td></tr>
+<tr><td><code>RATE_LIMITED</code> <span class="tag new">New</span></td><td>429</td><td>Too many requests. Includes a <code>Retry-After</code> header and <code>details.retryAfter</code> (seconds).</td></tr>
 <tr><td><code>INTERNAL</code></td><td>500</td><td>Unexpected server fault. Generic message only; details are in the server log.</td></tr>
 </tbody></table></div></section>
 <section id="auth"><h2>Auth <span class="count">9</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
@@ -151,6 +152,21 @@ ul.gaps{margin:8px 0 0;padding-left:20px;max-width:80ch}ul.gaps li{margin:6px 0}
 <tr><td>Dashboard count vs. document view</td><td>Always equal (changed + removed); both clear after opening</td><td>Same function computes both</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code></td></tr>
 <tr><td>Reading a doc with GET</td><td>Doesn't clear the banner</td><td>Only POST /open records the visit</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code></td></tr>
 </tbody></table></div></section>
+<section id="load"><h2>Load, concurrency &amp; rate limiting <span class="count">13</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
+<tr><td>More than 300 reads a minute from one user</td><td>429 <code>RATE_LIMITED</code> with <code>Retry-After</code></td><td>Fixed window per user, applied in <code>authed</code></td><td class="t"><span class="yes">✓</span> <code>scale.test.ts</code></td></tr>
+<tr><td>More than 120 writes a minute (PATCH, PUT, DELETE, POST)</td><td>429 <code>RATE_LIMITED</code> with <code>Retry-After</code>; reads still work</td><td>Separate write budget; a fast typist does about 60 autosaves a minute</td><td class="t"><span class="yes">✓</span> <code>scale.test.ts</code></td></tr>
+<tr><td>Waiting out the window</td><td>Requests succeed again after the window ends</td><td>Fixed window resets; test uses fake timers</td><td class="t"><span class="yes">✓</span> <code>scale.test.ts</code></td></tr>
+<tr><td>One user hits their limit while another keeps working</td><td>The other user is unaffected</td><td>Keys are per user id</td><td class="t"><span class="yes">✓</span> <code>scale.test.ts</code></td></tr>
+<tr><td>More than 20 sign-ins a minute from one IP; public user list over 300 a minute</td><td>429 <code>RATE_LIMITED</code>; other IPs unaffected</td><td>Keyed on the first <code>x-forwarded-for</code> address</td><td class="t"><span class="yes">✓</span> <code>scale.test.ts</code></td></tr>
+<tr><td>Autosave gets a 429 while typing</td><td>“Saving…” until the wait ends, then it saves; no edits lost</td><td>Client waits <code>Retry-After</code> (max 60 s) and retries without using its retry budget</td><td class="t"><span class="yes">✓</span> <code>autosave.test.ts</code></td></tr>
+<tr><td>Many users (10, 100, 1000) open the same document</td><td>All 200; one view row per user</td><td>Opens read the doc and do one atomic upsert on (user, document), so there is no cross-user contention</td><td class="t"><span class="yes">✓</span> <code>scale.test.ts</code></td></tr>
+<tr><td>Two tabs share with the same person at once</td><td>Both succeed; exactly one share row</td><td><code>INSERT … ON CONFLICT DO UPDATE</code> on the (document, user) key</td><td class="t"><span class="yes">✓</span> <code>scale.test.ts</code></td></tr>
+<tr><td>Two shares to different people at once</td><td>Both succeed; two independent rows</td><td>Different keys never touch the same row</td><td class="t"><span class="yes">✓</span> <code>scale.test.ts</code></td></tr>
+<tr><td>Delete while a save is in flight</td><td>Save lands first or gets 404; never 500</td><td>The guarded UPDATE matches no row, then the reload finds nothing</td><td class="t"><span class="yes">✓</span> <code>scale.test.ts</code></td></tr>
+<tr><td>Payload size at scale</td><td>413 past 1 MB (content) or 2 MB (import)</td><td>Every request has a byte cap, so per-request cost is bounded</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code><br><code>edge-import.test.ts</code></td></tr>
+<tr><td>1000 users at once on Neon</td><td>No connection errors; slower responses at worst</td><td>Production uses the pooled <code>DATABASE_URL</code> over <code>neon-http</code> (stateless HTTP per query, no transactions). Migrations use the unpooled URL</td><td class="t"><span class="manual">manual</span></td></tr>
+<tr><td>Limits are per serverless instance</td><td>A burst spread over many instances can exceed the budget</td><td>In-memory is best-effort. The production fix is Vercel WAF rules or Upstash Redis behind the same <code>RateLimiter</code> interface</td><td class="t"><span class="manual">by design</span></td></tr>
+</tbody></table></div></section>
 <section id="server-errors"><h2>Server errors <span class="count">4</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
 <tr><td>Any unexpected exception <span class="tag fixed">Fixed</span></td><td>500 <code>INTERNAL</code> “Something went wrong.”; no stack or paths in the response</td><td>Logged server-side with method and path</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
 <tr><td>Database unique violation <span class="tag new">New</span></td><td>409 <code>CONFLICT</code></td><td>Postgres SQLSTATE 23505 mapped, even when wrapped by Drizzle</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
@@ -161,7 +177,7 @@ ul.gaps{margin:8px 0 0;padding-left:20px;max-width:80ch}ul.gaps li{margin:6px 0}
 <li><b>Revoke racing a save.</b> A save that passed its access check a few milliseconds before the owner revoked still lands. Closing that window needs the role check inside the UPDATE; one request of overlap is acceptable here.</li>
 <li><b>Non-UTF-8 text encodings</b> (Latin-1, Windows-1252) are rejected with a clear message instead of guessed, because guessing silently corrupts accented text.</li>
 <li><b>Zip bombs.</b> A .docx is capped at 2 MB compressed and 1 MB of resulting content, but mammoth still inflates it in memory first.</li>
-<li><b>Rate limiting</b> and session revocation lists are out of scope for this build.</li>
+<li><b>Shared rate limits.</b> Limits are in memory per serverless instance, so they are best-effort. Session revocation lists are out of scope.</li>
 <li><b>sendBeacon</b> can only POST, so it can't call the PATCH route. The client doesn't use it; it flushes with <code>fetch</code> + <code>keepalive</code>. If that ever changes, the route already accepts <code>text/plain</code> bodies but would need a POST alias.</li>
 <li><b>Duplicate block ids</b> sent through the API are not de-duplicated; the editor's UniqueID extension prevents them in normal use.</li>
 </ul></section>
