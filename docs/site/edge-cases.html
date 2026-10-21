@@ -1,0 +1,168 @@
+<title>Ajaia Docs — Edge Cases &amp; Error Handling</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: single reading column, one scrollable table per area, sticky area index on wide screens. */
+:root{--bg:#FBFAF7;--fg:#1E2421;--mute:#5E6863;--line:#DDE0DA;--card:#F2F1EB;--accent:#2E5E4E;--amber:#9A5F12;--danger:#B3382C;--ok:#2E5E4E;--font:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141815;--fg:#E8EBE6;--mute:#9AA39D;--line:#2C332E;--card:#1C221E;--accent:#7FC2A8;--amber:#E8A33D;--danger:#F08A7E;--ok:#7FC2A8;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141815;--fg:#E8EBE6;--mute:#9AA39D;--line:#2C332E;--card:#1C221E;--accent:#7FC2A8;--amber:#E8A33D;--danger:#F08A7E;--ok:#7FC2A8;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--font);padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:1080px;margin:0 auto}
+h1{font-size:30px;line-height:1.15;margin:0 0 8px;text-wrap:balance;letter-spacing:-.02em}
+h2{font-size:20px;margin:40px 0 8px;padding-top:16px;border-top:1px solid var(--line);text-wrap:balance;display:flex;align-items:baseline;gap:10px}
+.count{font:500 12px var(--mono);color:var(--mute)}
+p{margin:0 0 10px;max-width:72ch}
+.lede{color:var(--mute);max-width:72ch}
+.summary{font-size:17px;font-weight:500;margin:18px 0 6px}
+.summary b{font-variant-numeric:tabular-nums}
+code{font-family:var(--mono);font-size:12.5px;overflow-wrap:anywhere}
+nav{display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 0;font-size:14px}
+nav a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+nav a:hover,nav a:focus-visible{border-bottom-color:currentColor;outline:none}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:6px;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:720px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td:first-child{width:30%}td:nth-child(2){width:28%}td.t{width:15%;white-space:nowrap}
+.codes table{min-width:520px}.codes td:first-child{width:auto}.codes td:nth-child(2){width:auto;font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:0}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);background:var(--card);font-weight:600}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:0 7px;border-radius:99px;border:1px solid currentColor;margin-left:4px;vertical-align:1px}
+.tag.fixed{color:var(--danger)}.tag.new{color:var(--amber)}
+.yes{color:var(--ok);font-weight:700}.manual{color:var(--amber);font-weight:600}
+td.t code{font-size:11.5px;color:var(--mute)}
+ul.gaps{margin:8px 0 0;padding-left:20px;max-width:80ch}ul.gaps li{margin:6px 0}
+.legend{font-size:13px;color:var(--mute)}
+</style>
+<main>
+<h1>Ajaia Docs — Edge Cases &amp; Error Handling</h1>
+<p class="summary"><b>84</b> scenarios, <b>83</b> covered by automated tests, <b>1</b> checked manually. <b>18</b> were bugs or gaps fixed in this pass.</p>
+<p class="lede">How the API behaves when requests are wrong, hostile, late or racing each other. Every error comes back as <code>{"error":{"code","message","details?"}}</code>. Tests live in <code>tests/</code> and run against an in-memory Postgres (PGlite). 65 tests before this pass, 185 after.</p>
+<p class="legend"><span class="tag fixed">Fixed</span> behaviour changed in this pass &nbsp; <span class="tag new">New</span> new rule or mapping</p>
+<nav aria-label="Areas"><a href="#codes">Error codes</a><a href="#auth">Auth</a><a href="#input">Input</a><a href="#documents">Documents</a><a href="#concurrency">Concurrency</a><a href="#sharing">Sharing</a><a href="#import">Import</a><a href="#catch-up">Catch-up</a><a href="#server-errors">Server errors</a><a href="#gaps">Not handled</a></nav>
+
+<section id="codes" class="codes"><h2>Error codes</h2>
+<div class="tw"><table><thead><tr><th>Code</th><th>Status</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>VALIDATION</code></td><td>400</td><td>The request is malformed: bad JSON, a missing or wrong field, a value out of range. <code>details.issues</code> lists Zod issues when present.</td></tr>
+<tr><td><code>UNAUTHENTICATED</code></td><td>401</td><td>No valid session. Sign in again.</td></tr>
+<tr><td><code>FORBIDDEN</code></td><td>403</td><td>You can see this document but your role can't do this, or the request came from another site.</td></tr>
+<tr><td><code>NOT_FOUND</code></td><td>404</td><td>The document doesn't exist or you have no access to it (the two look the same on purpose). Also used for a share that isn't there.</td></tr>
+<tr><td><code>STALE_VERSION</code></td><td>409</td><td>Someone saved first. <code>details.current</code> carries their version, who saved and the full doc.</td></tr>
+<tr><td><code>CONFLICT</code> <span class="tag new">New</span></td><td>409</td><td>A database uniqueness rule was hit. Retry after reloading.</td></tr>
+<tr><td><code>PAYLOAD_TOO_LARGE</code></td><td>413</td><td>Body over ~1 MB, content over 1 MB, upload over 2 MB, or an import with more than 10,000 lines/paragraphs.</td></tr>
+<tr><td><code>UNSUPPORTED_TYPE</code></td><td>415</td><td>Upload isn't .txt, .md or .docx, or its MIME type contradicts the extension.</td></tr>
+<tr><td><code>INVALID_CONTENT</code></td><td>422</td><td>Content doesn't fit the editor's schema, or is nested too deeply.</td></tr>
+<tr><td><code>EMPTY_FILE</code></td><td>422</td><td>The upload is empty or has no readable text.</td></tr>
+<tr><td><code>CORRUPT_FILE</code></td><td>422</td><td>Damaged .docx, text that isn't UTF-8/UTF-16, or a binary file renamed to .txt.</td></tr>
+<tr><td><code>SELF_SHARE</code></td><td>422</td><td>The owner tried to share with themself.</td></tr>
+<tr><td><code>USER_NOT_FOUND</code></td><td>422</td><td>No account uses that email.</td></tr>
+<tr><td><code>INTERNAL</code></td><td>500</td><td>Unexpected server fault. Generic message only; details are in the server log.</td></tr>
+</tbody></table></div></section>
+<section id="auth"><h2>Auth <span class="count">9</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
+<tr><td>No session cookie</td><td>401 <code>UNAUTHENTICATED</code>; pages redirect to sign-in</td><td>Identity comes only from the signed cookie, never the body</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code><br><code>access.test.ts</code></td></tr>
+<tr><td>Tampered, forged, wrong-secret or <code>alg: none</code> token</td><td>401</td><td>jose verifies HS256 with a fixed algorithm list</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Expired token (older than 7 days)</td><td>401</td><td><code>exp</code> checked on every request</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Validly signed token whose subject isn't a user id <span class="tag fixed">Fixed</span></td><td>401 (was 500)</td><td>Subject must be a UUID before the user lookup runs</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Cookie for a user who has since been deleted</td><td>401</td><td>The user row is re-loaded on every request</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Sign in with an unknown user id</td><td>404 <code>NOT_FOUND</code></td><td>Looked up before a cookie is issued</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Sign in with a malformed or missing user id</td><td>400 <code>VALIDATION</code></td><td>Zod requires a UUID</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Sign out while not signed in</td><td>204, cookie cleared</td><td>Sign-out is idempotent</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Cross-site write, or <code>Origin: null</code> <span class="tag fixed">Fixed</span></td><td>403 <code>FORBIDDEN</code> (null origin was 500)</td><td>Origin must parse and match the host; first <code>x-forwarded-host</code> value wins</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+</tbody></table></div></section>
+<section id="input"><h2>Input <span class="count">7</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
+<tr><td>Malformed JSON body</td><td>400 <code>VALIDATION</code> “Body must be valid JSON.”</td><td>Parsed in one place, <code>readJson</code></td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>JSON that isn't an object (<code>null</code>, array, string)</td><td>400</td><td>Zod object schemas reject it</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Wrong or missing Content-Type, including a <code>text/plain</code> sendBeacon flush</td><td>Accepted</td><td>Content-Type is not enforced; the Origin check and SameSite=Lax cover CSRF. The client flushes with <code>fetch(…, {keepalive})</code>, which also works</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Unknown fields such as <code>ownerId</code> or <code>version</code></td><td>Ignored</td><td>Zod strips them on every route, so nothing extra is stored</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Garbage or non-UUID <code>:id</code></td><td>404, never 500</td><td>Checked against a UUID pattern before any query</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code><br><code>access.test.ts</code></td></tr>
+<tr><td>Body over ~1 MB, or a Content-Length that claims more <span class="tag fixed">Fixed</span></td><td>413 <code>PAYLOAD_TOO_LARGE</code> before the body is read</td><td>Content-Length pre-check, then a byte check</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Unsupported HTTP method (e.g. PUT on a document)</td><td>405 with an <code>Allow</code> header</td><td>Next.js returns it for any method a route doesn't export</td><td class="t"><span class="manual">manual</span></td></tr>
+</tbody></table></div></section>
+<section id="documents"><h2>Documents <span class="count">17</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
+<tr><td>Empty or whitespace-only title</td><td>Saved as “Untitled document”</td><td>Trimmed, then defaulted</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Title with newlines, tabs or control characters (incl. NUL) <span class="tag fixed">Fixed</span></td><td>Saved on one line with single spaces (NUL was 500)</td><td>Control characters become spaces; whitespace collapses</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Title over 200 characters</td><td>400 <code>VALIDATION</code></td><td>Zod limit; DB check constraint as a backstop</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code><br><code>conflict.test.ts</code></td></tr>
+<tr><td>Emoji-only title</td><td>Saved as typed</td><td>Emoji are ordinary characters</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Title that isn't a string</td><td>400</td><td>Zod</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Content with the wrong root or a non-array <code>content</code></td><td>400</td><td>Zod shape check</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Unknown node or mark, empty text node, text at block level</td><td>422 <code>INVALID_CONTENT</code></td><td>Validated against the editor's own ProseMirror schema</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code><br><code>conflict.test.ts</code></td></tr>
+<tr><td>Content over 1 MB</td><td>413</td><td>Serialised size checked before parsing</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code><br><code>conflict.test.ts</code></td></tr>
+<tr><td>Deeply nested content (thousands of levels) <span class="tag fixed">Fixed</span></td><td>422 (was a stack overflow / 500)</td><td>Iterative depth check (200 JSON levels) before any recursive code runs</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>NUL characters inside text <span class="tag fixed">Fixed</span></td><td>Saved without them (was 500)</td><td>Stripped, because Postgres can't store U+0000</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td><code>baseVersion</code> missing, 0, negative, fractional or a string</td><td>400</td><td>Zod: integer ≥ 1, required with content</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td><code>baseVersion</code> from the future</td><td>409 <code>STALE_VERSION</code></td><td>Same path as a stale version</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Stale <code>baseVersion</code></td><td>409 with the current doc and who saved it</td><td>Conditional <code>UPDATE … WHERE version = base</code></td><td class="t"><span class="yes">✓</span> <code>conflict.test.ts</code></td></tr>
+<tr><td>“Keep mine” (force) by an editor / by a viewer</td><td>200 / 403</td><td>Role is checked before force is considered</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Save, rename, read or open after the doc was deleted <span class="tag fixed">Fixed</span></td><td>404</td><td>Access check; a rename that loses the race also returns 404 (was 200 with an empty body)</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Delete the same doc twice</td><td>404</td><td>Second call finds no document</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Viewer writes; stranger does anything</td><td>403; 404</td><td>Strangers never learn the doc exists</td><td class="t"><span class="yes">✓</span> <code>access.test.ts</code></td></tr>
+</tbody></table></div></section>
+<section id="concurrency"><h2>Concurrency <span class="count">6</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
+<tr><td>Two saves on the same <code>baseVersion</code> at once</td><td>Exactly one 200, the other 409</td><td>Compare-and-swap on <code>version</code> in a single statement</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Five saves at once</td><td>One 200, four 409; version bumps once</td><td>Same</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Two “Keep mine” saves at once <span class="tag fixed">Fixed</span></td><td>Both land, versions 2 and 3 (one used to get 409)</td><td>Force retries the compare-and-swap up to 3 times</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Rename while a content save is in flight</td><td>Both kept; version bumps once</td><td>Title is last-write-wins and never touches <code>version</code></td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Content save that doesn't send a title</td><td>Existing title kept</td><td>Title only written when sent</td><td class="t"><span class="yes">✓</span> <code>edge-documents.test.ts</code></td></tr>
+<tr><td>Owner revokes an editor while their save is in flight</td><td>Save lands or gets 404; never 500. Their next request is 404</td><td>Access is checked per request</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code></td></tr>
+</tbody></table></div></section>
+<section id="sharing"><h2>Sharing <span class="count">14</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
+<tr><td>Invalid email</td><td>400 “Enter a valid email address.”</td><td>Zod email</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code><br><code>shares.test.ts</code></td></tr>
+<tr><td>Email of someone with no account</td><td>422 <code>USER_NOT_FOUND</code></td><td>Email lower-cased, then looked up</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code></td></tr>
+<tr><td>Owner shares with themself (any casing)</td><td>422 <code>SELF_SHARE</code></td><td>Compared by user id</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code></td></tr>
+<tr><td>Editor or viewer tries to share; stranger tries</td><td>403; 404</td><td>Only the owner may share</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code><br><code>access.test.ts</code></td></tr>
+<tr><td>Invalid role (<code>owner</code>, <code>admin</code>, wrong case)</td><td>400</td><td>Zod enum viewer | editor</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code></td></tr>
+<tr><td>Note over 280 characters / whitespace-only / with control characters <span class="tag fixed">Fixed</span></td><td>400 / no note / stripped (NUL was 500)</td><td>Trimmed; line breaks kept, other control characters removed</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code></td></tr>
+<tr><td>Re-share someone already on the doc</td><td>201 first, then 200; one row; new role applies at once; a changed note is unread again</td><td>Upsert on (document, user)</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code><br><code>shares.test.ts</code></td></tr>
+<tr><td>Revoke someone who has no share</td><td>404, every time</td><td>Decided: not idempotent, so a stale share list shows up instead of silently passing</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code></td></tr>
+<tr><td>Revoke the owner <span class="tag fixed">Fixed</span></td><td>400 “The owner's access can't be removed.” (was a misleading 404)</td><td>Rejected before the delete</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code></td></tr>
+<tr><td>Editor or viewer tries to revoke</td><td>403</td><td>Only the owner may revoke</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code></td></tr>
+<tr><td>Revoked user's next GET, save, member list or note-seen</td><td>404</td><td>Their share row is gone, so they are a stranger</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code><br><code>shares.test.ts</code></td></tr>
+<tr><td>Editor or viewer opens the member list <span class="tag new">New</span></td><td>200 with owner first; only <code>userId, name, email, role</code></td><td>Any member may read; notes are owner-only</td><td class="t"><span class="yes">✓</span> <code>access.test.ts</code></td></tr>
+<tr><td>Mark note seen as the owner (no share row)</td><td>204, nothing changes</td><td>Update matches no rows</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code></td></tr>
+<tr><td>Mark note seen as a stranger</td><td>404</td><td>Access check first</td><td class="t"><span class="yes">✓</span> <code>edge-shares.test.ts</code></td></tr>
+</tbody></table></div></section>
+<section id="import"><h2>Import <span class="count">18</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
+<tr><td>No <code>file</code> field, a text field, or a JSON body</td><td>400</td><td>Must be multipart with a file</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+<tr><td>Several files in one request <span class="tag fixed">Fixed</span></td><td>400 “Import one file at a time.” (used to import the first silently)</td><td>All <code>file</code> parts counted</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+<tr><td>Empty file, or a file with no readable text</td><td>422 <code>EMPTY_FILE</code></td><td>Byte check, then a text check after parsing</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code><br><code>import.test.ts</code></td></tr>
+<tr><td>File over 2 MB</td><td>413</td><td>Content-Length pre-check, then the real byte count</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code><br><code>import.test.ts</code></td></tr>
+<tr><td>Unsupported, missing or double extension (<code>.pdf</code>, <code>README</code>, <code>.txt.exe</code>)</td><td>415 <code>UNSUPPORTED_TYPE</code></td><td>Extension allow-list: .txt .md .markdown .docx</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code><br><code>import.test.ts</code></td></tr>
+<tr><td>MIME contradicts the extension (<code>.md</code> sent as <code>image/png</code>)</td><td>415</td><td>Specific MIME types must match</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+<tr><td><code>.md</code> sent as <code>application/octet-stream</code> or with no type; uppercase extension</td><td>Imports normally</td><td>Generic MIME types defer to the extension</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+<tr><td><code>.docx</code> that is really text, or a damaged zip</td><td>422 <code>CORRUPT_FILE</code></td><td>Magic-byte check, then mammoth errors are caught</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code><br><code>import.test.ts</code></td></tr>
+<tr><td>Word file with images</td><td>Text kept; “Images are not supported and were removed.”</td><td>Images replaced with nothing and counted</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+<tr><td>Tables in .docx or .md <span class="tag fixed">Fixed</span></td><td>Each row becomes a paragraph, cells joined by “ · ”; reported as flattened (used to be one run-on line)</td><td>Tables rewritten before schema parsing</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code><br><code>import.test.ts</code></td></tr>
+<tr><td>Markdown with <code>&lt;script&gt;</code>, iframes, event handlers or <code>javascript:</code> links</td><td>Text kept; none of the markup or URLs survive</td><td>Parsed with JavaScript disabled, then filtered through the editor schema (links are off)</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code><br><code>import.test.ts</code></td></tr>
+<tr><td>.txt that contains HTML or Markdown</td><td>Shown literally</td><td>Escaped, one paragraph per line</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+<tr><td>UTF-8 with BOM; UTF-16 with BOM <span class="tag fixed">Fixed</span></td><td>Imports normally (UTF-16 used to be rejected)</td><td>Encoding chosen from the BOM</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+<tr><td>Latin-1 or other non-UTF-8 text</td><td>422 “Re-save it as UTF-8 and try again.”</td><td>Strict decoding; no guessing</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code><br><code>import.test.ts</code></td></tr>
+<tr><td>Text file containing NUL bytes (a renamed binary) <span class="tag fixed">Fixed</span></td><td>422 <code>CORRUPT_FILE</code> (was 500)</td><td>Rejected after decoding</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+<tr><td>CRLF or old-Mac CR line endings <span class="tag fixed">Fixed</span></td><td>One paragraph per line (CR-only used to be one paragraph)</td><td>Splits on CRLF, CR and LF</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+<tr><td>Hundreds of thousands of lines <span class="tag fixed">Fixed</span></td><td>413 in ~0.1 s (used to crash the server out of memory)</td><td>Block count capped at 10,000 before the HTML is parsed; past that it couldn't fit in 1 MB anyway</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+<tr><td>Filename with folders, control characters, unicode, or 250 emoji <span class="tag fixed">Fixed</span></td><td>Title is the bare name, one line, at most 200 characters, emoji never split</td><td>Path stripped, then the title clean-up used for documents</td><td class="t"><span class="yes">✓</span> <code>edge-import.test.ts</code></td></tr>
+</tbody></table></div></section>
+<section id="catch-up"><h2>Catch-up <span class="count">9</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
+<tr><td>First visit</td><td>No banner; dashboard marks it never opened</td><td>No view row means no baseline</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code><br><code>catchup.test.ts</code></td></tr>
+<tr><td>My own edits</td><td>Never highlighted for me</td><td>Changes filtered by author</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code><br><code>catchup.test.ts</code></td></tr>
+<tr><td>An editor changes a block</td><td>Owner and every other editor see it, with that editor's initials on the block</td><td>Per-block author stored with each content hash</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code></td></tr>
+<tr><td>Blocks deleted</td><td>Counted as removed, not changed</td><td>Tombstones (30 days, at most 200)</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code><br><code>catchup.test.ts</code></td></tr>
+<tr><td>Blocks reordered without edits</td><td>No change shown</td><td>Hash ignores position and ids</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code></td></tr>
+<tr><td>Blocks saved without ids (imported or pasted)</td><td>Get ids on save; show as new</td><td>Ids filled by the server before hashing</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code></td></tr>
+<tr><td>Legacy doc stored with no ids or history</td><td>Opens with no banner; after the next save every block shows as new once</td><td>No earlier hashes to compare with (known limitation)</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code></td></tr>
+<tr><td>Dashboard count vs. document view</td><td>Always equal (changed + removed); both clear after opening</td><td>Same function computes both</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code></td></tr>
+<tr><td>Reading a doc with GET</td><td>Doesn't clear the banner</td><td>Only POST /open records the visit</td><td class="t"><span class="yes">✓</span> <code>edge-catchup.test.ts</code></td></tr>
+</tbody></table></div></section>
+<section id="server-errors"><h2>Server errors <span class="count">4</span></h2><div class="tw"><table><thead><tr><th>Scenario</th><th>What the user sees / HTTP</th><th>How it's handled</th><th>Test</th></tr></thead><tbody>
+<tr><td>Any unexpected exception <span class="tag fixed">Fixed</span></td><td>500 <code>INTERNAL</code> “Something went wrong.”; no stack or paths in the response</td><td>Logged server-side with method and path</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Database unique violation <span class="tag new">New</span></td><td>409 <code>CONFLICT</code></td><td>Postgres SQLSTATE 23505 mapped, even when wrapped by Drizzle</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Foreign-key violation (the row vanished mid-request) <span class="tag new">New</span></td><td>404 <code>NOT_FOUND</code></td><td>SQLSTATE 23503</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+<tr><td>Check constraint, too-long value, bad format or invalid characters <span class="tag new">New</span></td><td>400 <code>VALIDATION</code></td><td>SQLSTATE 23514, 22001, 22P02, 22021, 22P05</td><td class="t"><span class="yes">✓</span> <code>edge-api.test.ts</code></td></tr>
+</tbody></table></div></section><section id="gaps"><h2>Not handled, on purpose</h2>
+<ul class="gaps">
+<li><b>Revoke racing a save.</b> A save that passed its access check a few milliseconds before the owner revoked still lands. Closing that window needs the role check inside the UPDATE; one request of overlap is acceptable here.</li>
+<li><b>Non-UTF-8 text encodings</b> (Latin-1, Windows-1252) are rejected with a clear message instead of guessed, because guessing silently corrupts accented text.</li>
+<li><b>Zip bombs.</b> A .docx is capped at 2 MB compressed and 1 MB of resulting content, but mammoth still inflates it in memory first.</li>
+<li><b>Rate limiting</b> and session revocation lists are out of scope for this build.</li>
+<li><b>sendBeacon</b> can only POST, so it can't call the PATCH route. The client doesn't use it; it flushes with <code>fetch</code> + <code>keepalive</code>. If that ever changes, the route already accepts <code>text/plain</code> bodies but would need a POST alias.</li>
+<li><b>Duplicate block ids</b> sent through the API are not de-duplicated; the editor's UniqueID extension prevents them in normal use.</li>
+</ul></section>
+</main>

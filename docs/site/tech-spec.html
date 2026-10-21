@@ -1,0 +1,165 @@
+<title>Ajaia Docs — Tech Spec</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#FBFAF7;--fg:#1E2421;--mute:#5E6863;--line:#DDE0DA;--card:#F2F1EB;--accent:#2E5E4E;--amber:#B9741A;--danger:#B3382C;--ok:#2E5E4E;--font:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141815;--fg:#E8EBE6;--mute:#9AA39D;--line:#2C332E;--card:#1C221E;--accent:#7FC2A8;--amber:#E8A33D;--danger:#F08A7E;--ok:#7FC2A8;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141815;--fg:#E8EBE6;--mute:#9AA39D;--line:#2C332E;--card:#1C221E;--accent:#7FC2A8;--amber:#E8A33D;--danger:#F08A7E;--ok:#7FC2A8;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--font);padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:980px;margin:0 auto}
+h1{font-size:30px;line-height:1.15;margin:0 0 8px;text-wrap:balance;letter-spacing:-.02em}
+h2{font-size:20px;margin:44px 0 10px;padding-top:18px;border-top:1px solid var(--line);text-wrap:balance}
+h3{font-size:15px;margin:22px 0 6px}
+p{margin:0 0 10px;max-width:68ch}
+.lede{color:var(--mute);max-width:68ch}
+code,.m{font-family:var(--mono);font-size:12.5px}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:6px;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);background:var(--card);font-weight:600}
+.tag{font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.ok{color:var(--ok)}.gap{color:var(--danger)}.warn{color:var(--amber)}
+figure{margin:12px 0}figure svg{max-width:100%;height:auto;display:block;color:var(--fg)}
+figcaption{color:var(--mute);font-size:13px;margin-top:6px;max-width:68ch}
+.tw svg{min-width:640px}
+.flows{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}
+.flow{background:var(--card);border-radius:8px;padding:12px 16px}
+.flow h3{margin:0 0 6px}.flow ol{margin:0;padding-left:20px}.flow li{margin:4px 0;font-size:14px}
+.cell-y{color:var(--ok);font-weight:600}.cell-n{color:var(--mute)}
+.note{font-size:13px;color:var(--mute)}
+a{color:var(--accent)}
+</style>
+<main>
+<h1>Ajaia Docs — Tech Spec</h1>
+<p class="lede">Status as of the code in <code>/ajaia-docs</code>. The backend is built; this page also lists what the prototype needs that it does not yet provide.</p>
+
+<h2>What it is</h2>
+<p>Ajaia Docs is a small collaborative document editor. People sign in as one of a few seeded users, write rich-text documents, import .txt/.md/.docx files, and share a document with a teammate as viewer or editor, with an optional short note. It has three parts: a <b>browser UI</b> (React with the TipTap editor), a <b>Next.js API</b> (route handlers under <code>app/api</code> plus service code in <code>lib/server</code>), and a <b>Postgres database</b> (PGlite files on a developer machine and in tests, Neon in production).</p>
+
+<h2>1. Architecture</h2>
+<figure>
+<svg viewBox="0 0 810 250" role="img" aria-label="The browser calls Next.js route handlers, which call services, which use Drizzle to query PGlite locally or Neon in production. The document lives as TipTap JSON in the documents.content column." font-family="Geist, system-ui, sans-serif" font-size="12">
+<defs><marker id="a1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="currentColor"/></marker></defs>
+<g fill="none" stroke="currentColor" stroke-width="1.3">
+<rect x="10" y="70" width="110" height="90" rx="6"/><rect x="180" y="70" width="110" height="90" rx="6"/><rect x="350" y="70" width="110" height="90" rx="6"/><rect x="520" y="70" width="110" height="90" rx="6"/>
+<rect x="690" y="30" width="110" height="80" rx="6"/><rect x="690" y="130" width="110" height="80" rx="6"/>
+<g marker-end="url(#a1)"><path d="M120 105H178"/><path d="M290 105H348"/><path d="M460 105H518"/><path d="M630 90L688 70"/><path d="M630 140L688 170"/></g>
+<path d="M178 135H122" marker-end="url(#a1)" stroke-dasharray="4 3"/>
+</g>
+<g fill="currentColor" text-anchor="middle">
+<text x="65" y="95" font-weight="600">Browser</text><text x="65" y="113">React UI</text><text x="65" y="129">TipTap editor</text><text x="65" y="145" fill="var(--amber)">doc as JSON</text>
+<text x="235" y="95" font-weight="600">Route handlers</text><text x="235" y="113">app/api/**</text><text x="235" y="129">check cookie,</text><text x="235" y="145">validate body</text>
+<text x="405" y="95" font-weight="600">Services</text><text x="405" y="113">lib/server</text><text x="405" y="129">access, documents,</text><text x="405" y="145">shares, import</text>
+<text x="575" y="95" font-weight="600">Drizzle ORM</text><text x="575" y="113">lib/db/schema</text><text x="575" y="129">one SQL layer</text><text x="575" y="145">for both DBs</text>
+<text x="745" y="55" font-weight="600">PGlite</text><text x="745" y="73">local + tests</text><text x="745" y="89">files in .pglite</text>
+<text x="745" y="155" font-weight="600">Neon Postgres</text><text x="745" y="173">production</text><text x="745" y="189">if DATABASE_URL set</text>
+<text x="149" y="98" font-size="10.5">fetch</text><text x="149" y="150" font-size="10.5">JSON</text>
+<text x="319" y="98" font-size="10.5">calls</text><text x="489" y="98" font-size="10.5">queries</text>
+<text x="405" y="30" font-size="11" fill="var(--amber)">Cookie ajaia_session (signed, httpOnly, 7 days) travels with every request</text>
+<text x="575" y="200" font-size="11" fill="var(--amber)">document body = documents.content (JSONB)</text>
+</g></svg>
+<figcaption>A request goes browser → route handler → service → Drizzle → one of two Postgres databases. The document text is stored as TipTap JSON in one database column. Which database is used depends only on whether <code>DATABASE_URL</code> is set.</figcaption>
+</figure>
+
+<h2>2. Key flows</h2>
+<div class="flows">
+<div class="flow"><h3>Autosave with version check</h3><ol>
+<li>Editor loads the doc and remembers its <code>version</code> (say 4).</li>
+<li>After a short pause in typing, browser sends PATCH with <code>content</code> and <code>baseVersion: 4</code>.</li>
+<li>Server updates the row only if its version is still 4, then sets version 5.</li>
+<li>Browser gets the new version back and shows "Saved".</li>
+<li>If someone else saved first (now 5), server answers <b>409 STALE_VERSION</b> with their current copy.</li>
+<li>Browser shows the conflict banner. "Keep mine" re-sends with <code>force: true</code>; "Use theirs" loads the copy from the 409.</li></ol></div>
+<div class="flow"><h3>Share, then recipient sees a note</h3><ol>
+<li>Owner opens Share, types an email, picks viewer or editor, adds a note (up to 280 characters).</li>
+<li>Browser sends PUT <code>/shares</code>. Server finds the user, saves the row, replies 201 (new) or 200 (updated).</li>
+<li>Recipient's dashboard list returns the doc under "shared" with <code>handoffNote</code> and <code>unreadNote: true</code>.</li>
+<li>Recipient opens the doc. The open call returns the note with <code>unread: true</code> and marks it seen.</li></ol></div>
+<div class="flow"><h3>Open doc, catch-up highlights</h3><ol>
+<li>Browser calls POST <code>/open</code>.</li>
+<li>Server finds blocks whose last editor is someone else and whose time is after my last visit.</li>
+<li>It returns <code>catchUp</code>: changed block ids, number of removed blocks, who edited how many.</li>
+<li>Only then does it record the new "last seen" time.</li>
+<li>Editor highlights the changed blocks; prev/next steps through <code>changedIds</code>. First visit returns <code>null</code> (nothing to catch up on).</li></ol></div>
+</div>
+<p style="margin-top:12px"><b>Import → report → undo:</b> the browser posts a file to <code>/api/import</code>; the server converts it, creates the document immediately and returns <code>{doc, report}</code> (kept / dropped / warnings); the report shows in the editor, and "Undo" is a plain DELETE on the new document.</p>
+
+<h2>3. Endpoints</h2>
+<p class="note">Taken from the route files in <code>app/api</code>. "Signed in" means a valid session cookie, otherwise 401. Unsafe methods from another origin are rejected with 403.</p>
+<div class="tw"><table>
+<tr><th>Method</th><th>Path</th><th>Who</th><th>What it does</th><th>Main errors</th><th>State</th></tr>
+<tr><td>GET</td><td class="m">/api/users</td><td>Anyone</td><td>Lists seeded users for the sign-in picker.</td><td>—</td><td class="ok">Built</td></tr>
+<tr><td>POST</td><td class="m">/api/session</td><td>Anyone</td><td>Signs in as a chosen user and sets the cookie.</td><td>400 bad body, 404 unknown user</td><td class="ok">Built</td></tr>
+<tr><td>DELETE</td><td class="m">/api/session</td><td>Anyone</td><td>Signs out (clears cookie).</td><td>—</td><td class="ok">Built</td></tr>
+<tr><td>GET</td><td class="m">/api/me</td><td>Signed in</td><td>Returns the current user.</td><td>401</td><td class="ok">Built</td></tr>
+<tr><td>GET</td><td class="m">/api/documents</td><td>Signed in</td><td>Lists my docs and docs shared with me, with role, last editor, "new for you" info and share note.</td><td>401</td><td class="ok">Built</td></tr>
+<tr><td>POST</td><td class="m">/api/documents</td><td>Signed in</td><td>Creates a blank doc (or from given content). Caller becomes owner.</td><td>400, 413 over 1 MB, 422 bad content</td><td class="ok">Built</td></tr>
+<tr><td>GET</td><td class="m">/api/documents/:id</td><td>Owner, editor, viewer</td><td>Returns doc, my role, catch-up and share note. Does not record a visit.</td><td>401, 404 no access</td><td class="ok">Built</td></tr>
+<tr><td>POST</td><td class="m">/api/documents/:id/open</td><td>Owner, editor, viewer</td><td>Same data as GET, then records my visit and marks the note seen.</td><td>401, 404</td><td class="ok">Built</td></tr>
+<tr><td>PATCH</td><td class="m">/api/documents/:id</td><td>Owner, editor</td><td>Saves title and/or content. Content needs <code>baseVersion</code>; <code>force</code> overrides.</td><td>400, 403 viewer, 404, <b>409 stale</b>, 413, 422</td><td class="ok">Built</td></tr>
+<tr><td>DELETE</td><td class="m">/api/documents/:id</td><td>Owner</td><td>Deletes the doc and its shares and views.</td><td>403, 404</td><td class="ok">Built</td></tr>
+<tr><td>GET</td><td class="m">/api/documents/:id/shares</td><td>Owner</td><td>Lists who has access, role, note, whether note was seen.</td><td>403, 404</td><td class="ok">Built</td></tr>
+<tr><td>PUT</td><td class="m">/api/documents/:id/shares</td><td>Owner</td><td>Shares by email, or updates role/note. A changed note becomes unread again.</td><td>403, 404, 422 unknown email or self-share</td><td class="ok">Built</td></tr>
+<tr><td>DELETE</td><td class="m">/api/documents/:id/shares/:userId</td><td>Owner</td><td>Removes someone's access.</td><td>403, 404</td><td class="ok">Built</td></tr>
+<tr><td>POST</td><td class="m">/api/import</td><td>Signed in</td><td>Uploads .txt, .md or .docx (max 2 MB), creates the doc, returns a fidelity report.</td><td>413, 415, 422 empty or corrupt</td><td class="ok">Built</td></tr>
+</table></div>
+
+<h2>4. Screen to endpoint map</h2>
+<p class="note">Screens come from <code>prototype/index.html</code> and its screenshot names. <code>prototype/DESIGN-NOTES.md</code> and <code>docs/UI-SKILLS.md</code> did not exist when this was written.</p>
+<div class="tw"><table>
+<tr><th>Screen / state</th><th>Powered by</th><th></th></tr>
+<tr><td>Login</td><td>GET /api/users, POST /api/session</td><td class="ok">Covered</td></tr>
+<tr><td>Dashboard lists (mine / shared)</td><td>GET /api/documents: title, role, owner, updatedAt, lastEditedBy</td><td class="ok">Covered</td></tr>
+<tr><td>Dashboard "new for you"</td><td>Each card has <code>newForYou {changedBlocks, unreadNote, neverOpened}</code>; section and filter counts are computed in the browser</td><td class="ok">Covered</td></tr>
+<tr><td>Dashboard search box</td><td>Nothing. List has titles only, no text</td><td class="gap">GAP 2</td></tr>
+<tr><td>New doc, delete</td><td>POST /api/documents, DELETE /api/documents/:id</td><td class="ok">Covered</td></tr>
+<tr><td>Editor, freshness line "Edited by X · 2h ago"</td><td><code>doc.lastEditedBy</code> + <code>doc.updatedAt</code> from GET/open. Wrong after a title-only save</td><td class="warn">GAP 3</td></tr>
+<tr><td>Save status (Saving / Saved)</td><td>PATCH response gives version, updatedAt, title. Offline/error is browser-side</td><td class="ok">Covered</td></tr>
+<tr><td>Conflict banner and choice</td><td>409 body: <code>current.updatedBy</code>, <code>updatedAt</code>, full <code>doc</code>. "Keep mine" = <code>force: true</code></td><td class="ok">Covered</td></tr>
+<tr><td>Catch-up highlights, prev/next</td><td><code>catchUp.changedIds</code>, <code>removedCount</code>, <code>editors</code>; stepping is browser-side</td><td class="ok">Covered</td></tr>
+<tr><td>Handoff note, "Got it"</td><td><code>handoff {note, from, unread}</code> arrives; open marks it seen automatically. No separate dismiss</td><td class="gap">GAP 1</td></tr>
+<tr><td>Share dialog (add, role, note, remove, undo remove)</td><td>GET/PUT/DELETE shares. Undo = PUT again</td><td class="ok">Covered</td></tr>
+<tr><td>Import dialog, report, undo</td><td>POST /api/import → <code>{doc, report}</code>; undo = DELETE doc</td><td class="ok">Covered</td></tr>
+<tr><td>Viewer read-only</td><td><code>role</code> in GET/open; server also returns 403 on PATCH</td><td class="ok">Covered</td></tr>
+<tr><td>Not found / no access</td><td>404 from GET/open. Strangers always get 404, so the prototype's "403 No access" never appears for them</td><td class="ok">Covered</td></tr>
+</table></div>
+
+<h3>Backend gaps to build</h3>
+<ol>
+<li><b>Dismiss note separately from opening.</b> Today <code>/open</code> marks the note seen. Fix: stop doing that in <code>openDocument</code> and add <code>POST /api/documents/:id/note/seen</code> that sets <code>note_seen_at</code>; "Got it" calls it.</li>
+<li><b>Search titles and text.</b> No endpoint exists. Fix: add optional <code>?q=</code> to <code>GET /api/documents</code> filtering with ILIKE on title and on the content text.</li>
+<li><b>Freshness line after a title-only save.</b> The title branch of <code>saveDocument</code> updates <code>updatedAt</code> but not <code>last_edited_by</code>, so the line can name the wrong person. Fix: set <code>lastEditedBy</code> in that update.</li>
+</ol>
+
+<h2>5. Database</h2>
+<div class="tw"><table>
+<tr><th>Table</th><th>In plain words</th><th>Key columns</th></tr>
+<tr><td class="m">users</td><td>The seeded people who can sign in.</td><td class="m">id, email (unique), name, avatar_hue</td></tr>
+<tr><td class="m">documents</td><td>One row per document, including its full body.</td><td class="m">id, owner_id, title (≤200), content (JSONB), block_meta (JSONB), version, last_edited_by, source (blank/import), updated_at</td></tr>
+<tr><td class="m">shares</td><td>Who else can open a doc, as viewer or editor, plus the note.</td><td class="m">(document_id, user_id) key, role, note (≤280), note_seen_at</td></tr>
+<tr><td class="m">document_views</td><td>When each person last opened each doc; drives catch-up.</td><td class="m">(user_id, document_id) key, last_seen_at</td></tr>
+</table></div>
+<p><code>block_meta</code> maps each top-level block id to a content hash, who last changed it and when. Catch-up is a filter over it, not a text diff.</p>
+<figure>
+<svg viewBox="0 0 780 275" role="img" aria-label="users is referenced by documents, shares and document_views. documents is referenced by shares and document_views." font-family="Geist, system-ui, sans-serif" font-size="12">
+<g fill="none" stroke="currentColor" stroke-width="1.3"><rect x="20" y="10" width="740" height="50" rx="6"/><rect x="20" y="130" width="220" height="96" rx="6"/><rect x="280" y="130" width="220" height="96" rx="6"/><rect x="540" y="130" width="220" height="96" rx="6"/>
+<path d="M130 60V130M390 60V130M650 60V130"/><path d="M240 178H280M500 178H540"/><path d="M130 226V252H650V226"/></g>
+<g fill="currentColor"><text x="30" y="30" font-weight="600">users</text><text x="30" y="48" class="m">id · email · name · avatar_hue</text>
+<text x="30" y="150" font-weight="600">documents</text><text x="30" y="170">id · owner_id · title</text><text x="30" y="188">content · block_meta · version</text><text x="30" y="206">last_edited_by · source</text>
+<text x="290" y="150" font-weight="600">shares</text><text x="290" y="170">document_id · user_id</text><text x="290" y="188">role · note · note_seen_at</text>
+<text x="550" y="150" font-weight="600">document_views</text><text x="550" y="170">user_id · document_id</text><text x="550" y="188">last_seen_at</text>
+<g font-size="10.5" fill="var(--amber)"><text x="136" y="100">owner_id, last_edited_by</text><text x="396" y="100">user_id</text><text x="656" y="100">user_id</text><text x="246" y="170">1:N</text><text x="506" y="170">1:N</text><text x="390" y="268" text-anchor="middle">document_id (1:N)</text></g></g></svg>
+<figcaption>Every table points at users; shares and document_views also point at documents. Deleting a user or document cascades to its shares and views.</figcaption>
+</figure>
+
+<h2>6. Access rules</h2>
+<div class="tw"><table>
+<tr><th>Role</th><th>Read</th><th>Edit</th><th>Rename</th><th>Share</th><th>Delete</th></tr>
+<tr><td>Owner</td><td class="cell-y">Yes</td><td class="cell-y">Yes</td><td class="cell-y">Yes</td><td class="cell-y">Yes</td><td class="cell-y">Yes</td></tr>
+<tr><td>Editor</td><td class="cell-y">Yes</td><td class="cell-y">Yes</td><td class="cell-y">Yes</td><td class="cell-n">No (403)</td><td class="cell-n">No (403)</td></tr>
+<tr><td>Viewer</td><td class="cell-y">Yes</td><td class="cell-n">No (403)</td><td class="cell-n">No (403)</td><td class="cell-n">No (403)</td><td class="cell-n">No (403)</td></tr>
+<tr><td>Stranger</td><td class="cell-n">No (404)</td><td class="cell-n">No (404)</td><td class="cell-n">No (404)</td><td class="cell-n">No (404)</td><td class="cell-n">No (404)</td></tr>
+</table></div>
+<p class="note">From <code>lib/server/access.ts</code>. Rename is a "write" action, so editors can rename. Strangers get 404 so the existence of a document is not revealed.</p>
+</main>

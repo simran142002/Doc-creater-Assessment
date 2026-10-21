@@ -1,0 +1,121 @@
+<title>Ajaia Docs — Stack Ledger</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#FBFAF7;--fg:#1E2421;--mute:#5E6863;--line:#DDE0DA;--card:#F2F1EB;--accent:#2E5E4E;--amber:#B9741A;--danger:#B3382C;--ok:#2E5E4E;--font:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141815;--fg:#E8EBE6;--mute:#9AA39D;--line:#2C332E;--card:#1C221E;--accent:#7FC2A8;--amber:#E8A33D;--danger:#F08A7E;--ok:#7FC2A8;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141815;--fg:#E8EBE6;--mute:#9AA39D;--line:#2C332E;--card:#1C221E;--accent:#7FC2A8;--amber:#E8A33D;--danger:#F08A7E;--ok:#7FC2A8;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--font);padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:980px;margin:0 auto}
+h1{font-size:30px;line-height:1.15;margin:0 0 8px;text-wrap:balance;letter-spacing:-.02em}
+h2{font-size:20px;margin:44px 0 10px;padding-top:18px;border-top:1px solid var(--line);text-wrap:balance}
+h3{font-size:15px;margin:22px 0 6px}
+p{margin:0 0 10px;max-width:68ch}
+.lede{color:var(--mute);max-width:68ch}
+code,.m{font-family:var(--mono);font-size:12.5px}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:6px;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);background:var(--card);font-weight:600}
+.tag{font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.ok{color:var(--ok)}.gap{color:var(--danger)}.warn{color:var(--amber)}
+figure{margin:12px 0}figure svg{max-width:100%;height:auto;display:block;color:var(--fg)}
+figcaption{color:var(--mute);font-size:13px;margin-top:6px;max-width:68ch}
+.tw svg{min-width:640px}
+.flows{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}
+.flow{background:var(--card);border-radius:8px;padding:12px 16px}
+.flow h3{margin:0 0 6px}.flow ol{margin:0;padding-left:20px}.flow li{margin:4px 0;font-size:14px}
+.cell-y{color:var(--ok);font-weight:600}.cell-n{color:var(--mute)}
+.note{font-size:13px;color:var(--mute)}
+a{color:var(--accent)}
+</style>
+<main>
+<h1>Ajaia Docs — Stack Ledger</h1>
+<p class="lede">A hand-edited inventory of what the project uses. To update, edit the matching <code>&lt;tr&gt;</code> in <code>docs/site/stack-ledger.html</code>, change the "Last updated" line and add a changelog entry. Versions are exact pins from <code>package.json</code> and the prototype's script tags. Licences were filled in from memory and should be checked before shipping.</p>
+<p><b>Last updated:</b> <span id="updated">2026-10-21</span></p>
+
+<h2>a. Services and hosting</h2>
+<div class="tw"><table id="services">
+<tr><th>Service</th><th>Plan</th><th>Used for</th><th>Status</th></tr>
+<tr><td>Vercel</td><td>Free (Hobby)</td><td>Hosting the Next.js app</td><td class="warn">Planned</td></tr>
+<tr><td>Neon</td><td>Free tier</td><td>Production Postgres (used when <code>DATABASE_URL</code> is set)</td><td class="warn">Planned (driver in code)</td></tr>
+<tr><td>PGlite (in-process)</td><td>Free, local</td><td>Local development and tests database</td><td class="ok">In use</td></tr>
+<tr><td>Google Fonts</td><td>Free</td><td>Geist, Geist Mono, Instrument Serif, Newsreader in the prototype</td><td class="ok">In use</td></tr>
+</table></div>
+
+<h2>b. npm packages</h2>
+<h3>Dependencies</h3>
+<div class="tw"><table id="deps">
+<tr><th>Package</th><th>Version</th><th>Used for</th><th>Licence</th></tr>
+<tr><td>next</td><td>16.4.2</td><td>App framework and API routes</td><td>MIT</td></tr>
+<tr><td>react / react-dom</td><td>19.3.1</td><td>UI rendering</td><td>MIT</td></tr>
+<tr><td>@tiptap/core, react, pm, starter-kit, extensions, html</td><td>3.32.0</td><td>Rich-text editor and HTML-to-JSON</td><td>MIT</td></tr>
+<tr><td>@tiptap/extension-unique-id</td><td>3.32.0</td><td>Stable ids on blocks for catch-up</td><td>MIT</td></tr>
+<tr><td>drizzle-orm</td><td>0.45.4</td><td>Typed SQL queries and schema</td><td>Apache-2.0</td></tr>
+<tr><td>@electric-sql/pglite</td><td>0.5.11</td><td>Embedded Postgres for local and tests</td><td>Apache-2.0</td></tr>
+<tr><td>@neondatabase/serverless</td><td>1.2.0</td><td>Postgres driver for Neon</td><td>MIT</td></tr>
+<tr><td>jose</td><td>6.2.13</td><td>Sign and verify session cookie</td><td>MIT</td></tr>
+<tr><td>zod</td><td>4.6.7</td><td>Validate request bodies</td><td>MIT</td></tr>
+<tr><td>mammoth</td><td>1.13.0</td><td>Convert .docx to HTML on import</td><td>BSD-2-Clause</td></tr>
+<tr><td>marked</td><td>18.1.1</td><td>Convert Markdown to HTML on import</td><td>MIT</td></tr>
+<tr><td>happy-dom</td><td>20.14.6</td><td>Fake DOM for server-side HTML parsing</td><td>MIT</td></tr>
+<tr><td>radix-ui</td><td>1.8.1</td><td>Accessible dialog and menu parts</td><td>MIT</td></tr>
+<tr><td>lucide-react</td><td>1.61.0</td><td>Icons</td><td>ISC</td></tr>
+<tr><td>sonner</td><td>2.0.8</td><td>Toast notifications</td><td>MIT</td></tr>
+<tr><td>motion</td><td>14.5.0</td><td>UI animation</td><td>MIT</td></tr>
+<tr><td>class-variance-authority</td><td>0.7.1</td><td>Component style variants</td><td>Apache-2.0</td></tr>
+<tr><td>clsx</td><td>2.1.1</td><td>Join CSS class names</td><td>MIT</td></tr>
+<tr><td>tailwind-merge</td><td>3.7.0</td><td>Resolve clashing Tailwind classes</td><td>MIT</td></tr>
+</table></div>
+<h3>Dev dependencies</h3>
+<div class="tw"><table id="devdeps">
+<tr><th>Package</th><th>Version</th><th>Used for</th><th>Licence</th></tr>
+<tr><td>typescript</td><td>5.9.3</td><td>Type checking</td><td>Apache-2.0</td></tr>
+<tr><td>vitest</td><td>5.0.5</td><td>Test runner</td><td>MIT</td></tr>
+<tr><td>eslint / eslint-config-next</td><td>9.39.5 / 16.4.2</td><td>Lint rules</td><td>MIT</td></tr>
+<tr><td>tailwindcss / @tailwindcss/postcss</td><td>4.3.3</td><td>Styling</td><td>MIT</td></tr>
+<tr><td>tw-animate-css</td><td>1.4.0</td><td>Animation utility classes</td><td>MIT</td></tr>
+<tr><td>drizzle-kit</td><td>0.31.11</td><td>Generate database migrations</td><td>Apache-2.0</td></tr>
+<tr><td>tsx</td><td>4.23.15</td><td>Run TypeScript scripts (migrate, seed)</td><td>MIT</td></tr>
+<tr><td>docx</td><td>9.13.0</td><td>Build .docx test fixtures</td><td>MIT</td></tr>
+<tr><td>@types/node, react, react-dom</td><td>24.19.2 / 19.3.0 / 19.3.0</td><td>TypeScript type definitions</td><td>MIT</td></tr>
+</table></div>
+
+<h2>c. CDN libraries in the prototype</h2>
+<p class="note">From <code>prototype/index.html</code>. The prototype's TipTap and ProseMirror modules are 2.x, loaded as ES modules through an import map; the app uses TipTap 3.</p>
+<div class="tw"><table id="cdn">
+<tr><th>Library</th><th>Version</th><th>Via</th><th>Used for</th></tr>
+<tr><td>marked</td><td>15.0.12</td><td>jsDelivr</td><td>Import .md</td></tr>
+<tr><td>mammoth (browser build)</td><td>1.9.1</td><td>jsDelivr</td><td>Import .docx</td></tr>
+<tr><td>canvas-confetti</td><td>1.9.3</td><td>jsDelivr</td><td>Celebration effect</td></tr>
+<tr><td>@rive-app/canvas</td><td>2.37.5</td><td>jsDelivr</td><td>Play the teddy animation</td></tr>
+<tr><td>@tiptap/core, @tiptap/pm</td><td>2.27.x</td><td>jsDelivr +esm</td><td>Editor in the prototype</td></tr>
+<tr><td>prosemirror-model / view / state / transform</td><td>1.25.11 / 1.42.3 / 1.4.4 / 1.12.0</td><td>jsDelivr +esm (import-map overrides)</td><td>Editor internals</td></tr>
+<tr><td>Fonts: Geist, Geist Mono, Instrument Serif, Newsreader</td><td>Google Fonts</td><td>fonts.googleapis.com</td><td>Prototype typography</td></tr>
+</table></div>
+
+<h2>d. Open-source repos and assets</h2>
+<div class="tw"><table id="assets">
+<tr><th>Item</th><th>Where</th><th>Used for</th><th>Source / licence</th></tr>
+<tr><td>teddy.riv, teddy-riv.js</td><td class="m">prototype/assets/</td><td>Rive teddy animation</td><td>Origin and licence not recorded. To confirm</td></tr>
+<tr><td>shadcn skill</td><td class="m">.claude/skills/shadcn</td><td>Guidance for shadcn/ui components</td><td>Licence file in folder (LICENSE.md)</td></tr>
+<tr><td>frontend-design skill</td><td class="m">.claude/skills/frontend-design</td><td>Guidance for UI design</td><td>Licence file in folder (LICENSE.txt)</td></tr>
+</table></div>
+
+<h2>e. AI tools and skills used</h2>
+<div class="tw"><table id="ai">
+<tr><th>Tool</th><th>Used for</th></tr>
+<tr><td>Claude Code, with subagents</td><td>Building the app, prototype and these pages; parallel agents for separate tasks</td></tr>
+<tr><td>Artifact skills (artifact-design, artifact-diagramming)</td><td>Layout, theming and diagrams for these two pages</td></tr>
+<tr><td>frontend-design skill (project-installed)</td><td>UI design direction</td></tr>
+<tr><td>shadcn skill (project-installed)</td><td>shadcn/ui component rules</td></tr>
+</table></div>
+
+<h2>f. Changelog</h2>
+<ul id="changelog">
+<li><b>2026-10-21</b> First version of the ledger, built from <code>package.json</code> and the prototype.</li>
+<li><b>2026-10-21</b> UI foundation: 18 shadcn components, <code>motion</code>, <code>@tiptap/react</code>. Skills installed: frontend-design (anthropics/skills @ dbd4588f) and shadcn (shadcn-ui/ui @ ba1503c6, vetted subset with the auto-run CLI removed). Rejected: Vercel web-design-guidelines (fetches its rules at run time), ui-ux-pro-max (runs scripts), web-artifacts-builder (wrong target). See <code>docs/UI-SKILLS.md</code>.</li>
+<li><b>2026-10-21</b> New endpoint <code>POST /api/documents/:id/note/seen</code>; no new packages.</li>
+</ul>
+</main>
