@@ -6,7 +6,7 @@ Ajaia Docs is a lightweight collaborative document editor built as a take-home. 
 
 ## Links
 
-- **Live app:** _TBD (deploying)_
+- **Live app:** https://ajaia-docs-blond-nu.vercel.app (pick any seeded user, no password)
 - **Walkthrough video:** _TBD_
 - **Design and planning pages** (private claude.ai pages, shared with reviewers on request):
   [Product analysis](https://claude.ai/artifact/NzbFAXKpMCgw5HWw2YhnrF) · [Tech spec](https://claude.ai/artifact/2Wx5ykPdLfiBKLhh7hVZ4Y) · [Stack ledger](https://claude.ai/artifact/8GeymUd4G41WwdwfTfV3pe) · [Edge cases & error handling](https://claude.ai/artifact/Ez23KqMKHA6hkQkggtn5hd)
@@ -149,7 +149,7 @@ Deliberate cuts, chosen to fit a 4-6 hour build:
 
 **Working:** auth, document CRUD, autosave and conflict handling, sharing and roles, import with report and Undo, catch-up and handoff notes, UI matching the approved prototype (responsive at 360/768/1440, Rive + motion), 185 passing tests, clean typecheck, lint and build.
 
-**In progress:** deployment (Vercel plus Neon).
+**Deployed:** Vercel (Hobby) + Neon Postgres (free), migrations and seed run on each deploy.
 
 **Incomplete:** walkthrough video, live URL, AI_WORKFLOW.md.
 
